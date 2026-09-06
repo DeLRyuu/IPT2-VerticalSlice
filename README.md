@@ -134,6 +134,7 @@ VerticalSlice/
 | ------ | -------------------- | -------------------- | --------------------------------------------- |
 | POST   | `/api/students`      | Create a new student | `{ firstName, lastName, email, dateOfBirth }` |
 | GET    | `/api/students/{id}` | Get student by ID    | —                                             |
+| GET 	 | `/api/students` 		| Get all students 	   | —											   |
 
 ### Courses
 
@@ -141,6 +142,7 @@ VerticalSlice/
 | ------ | ------------------- | ------------------- | -------------------------- |
 | POST   | `/api/courses`      | Create a new course | `{ title, code, credits }` |
 | GET    | `/api/courses/{id}` | Get course by ID    | —                          |
+| GET 	 | `/api/courses` 	   | Get all courses 	 | —                          |
 
 ### Admissions
 
