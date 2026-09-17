@@ -5,6 +5,7 @@ using Application.Abstractions.Messaging;
 using Application.Features.Courses.CreateCourse;
 using Application.Features.Courses.GetAllCourses;
 using Application.Features.Courses.GetCourseById;
+using Application.Features.Courses.UpdateCourse;
 using Domain.Common;
 
 public static class CourseEndpoints
@@ -17,6 +18,10 @@ public static class CourseEndpoints
         group.MapGet("/", GetAll)
             .WithName("GetAllCourses")
             .WithSummary("Get all courses");
+
+        group.MapPut("/{id:guid}", Update)
+            .WithName("UpdateCourse")
+            .WithSummary("Update an existing course");
 
         group.MapPost("/", Create)
             .WithName("CreateCourse")
@@ -60,4 +65,20 @@ public static class CourseEndpoints
             ? TypedResults.Ok(result.Value)
             : result.ToProblemDetails();
     }
+
+    private static async Task<IResult> Update(
+        Guid id,
+        UpdateCourseRequest request,
+        ICommandHandler<UpdateCourseCommand, Result<UpdateCourseResponse>> handler,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdateCourseCommand(id, request.Title, request.Code, request.Credits);
+        var result = await handler.HandleAsync(command, cancellationToken);
+
+        return result.Match(
+            onSuccess: value => TypedResults.Ok(value),
+            onFailure: _ => result.ToProblemDetails());
+    }
 }
+
+public sealed record UpdateCourseRequest(string Title, string Code, int Credits);

@@ -12,6 +12,7 @@ using Application.Features.Courses.GetCourseById;
 using Application.Features.Admissions.CreateAdmission;
 using Application.Features.Admissions.GetAdmissionById;
 using Application.Features.Admissions.GetAllAdmissions;
+using Application.Features.Courses.UpdateCourse;
 using Domain.Common;
 using FluentValidation;
 using Infrastructure.Persistence;
@@ -37,6 +38,7 @@ builder.Services.AddScoped<IQueryHandler<GetCourseByIdQuery, Result<GetCourseByI
 builder.Services.AddScoped<ICommandHandler<CreateAdmissionCommand, Result<CreateAdmissionResponse>>, CreateAdmissionCommandHandler>();
 builder.Services.AddScoped<IQueryHandler<GetAdmissionByIdQuery, Result<GetAdmissionByIdResponse>>, GetAdmissionByIdQueryHandler>();
 builder.Services.AddScoped<IQueryHandler<GetAllAdmissionsQuery, Result<GetAllAdmissionsResponse>>, GetAllAdmissionsQueryHandler>();
+builder.Services.AddScoped<ICommandHandler<UpdateCourseCommand, Result<UpdateCourseResponse>>, UpdateCourseCommandHandler>();
 
 // API
 builder.Services.AddEndpointsApiExplorer();
