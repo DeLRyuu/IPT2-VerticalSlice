@@ -25,6 +25,8 @@ using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using Microsoft.OpenApi;
 
@@ -52,6 +54,7 @@ builder.Services.AddScoped<ICommandHandler<UpdateCourseCommand, Result<UpdateCou
 builder.Services.AddScoped<IPasswordHasher, Infrastructure.Authentication.PasswordHasher>();
 builder.Services.AddScoped<ICommandHandler<RegisterCommand, Result<RegisterResponse>>, RegisterCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<LoginCommand, Result<LoginResponse>>, LoginCommandHandler>();
+builder.Services.AddHostedService<Infrastructure.BackgroundJobs.RevokedTokenCleanupService>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -61,26 +64,28 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, _, _) =>
     {
-    document.Components ??= new OpenApiComponents();
-    document.Components.SecuritySchemes ??= new Dictionary<string,
-    IOpenApiSecurityScheme>();
-    document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-    {
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        Description = "Paste the access token from /api/auth/login"
-    };
-    document.Security ??= [];
-    document.Security.Add(new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
-    });
-    
-    return Task.CompletedTask;
+        document.Info.Title = "Vertical Slice API";
+        document.Info.Description = "A simple API demonstrating Vertical Slice Architecture";
+
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "Paste the access token from /api/auth/login"
+        };
+
+        document.Security ??= [];
+        document.Security.Add(new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
+
+        return Task.CompletedTask;
     });
 });
-
 
 // JWT options
 builder.Services.AddOptions<JwtOptions>()
@@ -107,6 +112,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSection["SigningKey"]!)),
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var dbContext = context.HttpContext.RequestServices
+                    .GetRequiredService<IAppDbContext>();
+
+                var jti = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti);
+                var sub = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                var iatRaw = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Iat);
+
+                if (jti is not null && await dbContext.RevokedTokens.AnyAsync(r => r.Jti == jti))
+                {
+                    context.Fail("Token has been revoked.");
+                    return;
+                }
+
+                if (sub is not null && Guid.TryParse(sub, out var userId) && iatRaw is not null
+                    && long.TryParse(iatRaw, out var iatUnix))
+                {
+                    var issuedAtUtc = DateTimeOffset.FromUnixTimeSeconds(iatUnix).UtcDateTime;
+                    var user = await dbContext.Users.FindAsync([userId]);
+
+                    if (user?.TokensValidFromUtc is { } validFrom && issuedAtUtc < validFrom)
+                    {
+                        context.Fail("Token was issued before the user's last sign-out-everywhere.");
+                    }
+                }
+            }
         };
     });
 
