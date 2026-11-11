@@ -24,6 +24,7 @@ using Infrastructure.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -56,6 +57,7 @@ builder.Services.AddScoped<IPasswordHasher, Infrastructure.Authentication.Passwo
 builder.Services.AddScoped<ICommandHandler<RegisterCommand, Result<RegisterResponse>>, RegisterCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<LoginCommand, Result<LoginResponse>>, LoginCommandHandler>();
 builder.Services.AddHostedService<Infrastructure.BackgroundJobs.RevokedTokenCleanupService>();
+builder.Services.AddSingleton<IAuthorizationHandler, AdmissionOwnerHandler>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
