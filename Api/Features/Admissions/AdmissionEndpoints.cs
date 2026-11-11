@@ -12,7 +12,8 @@ public static class AdmissionEndpoints
     public static void MapAdmissionEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admissions")
-            .WithTags("Admissions");
+            .WithTags("Admissions")
+            .RequireAuthorization();
 
         group.MapPost("/", Create)
             .WithName("CreateAdmission")
@@ -37,9 +38,10 @@ public static class AdmissionEndpoints
             ? TypedResults.CreatedAtRoute(result.Value, "GetAdmissionById", new { id = result.Value!.Id })
             : result.ToProblemDetails();
     }
+
     private static async Task<IResult> GetAll(
-    IQueryHandler<GetAllAdmissionsQuery, Result<GetAllAdmissionsResponse>> handler,
-    CancellationToken cancellationToken)
+        IQueryHandler<GetAllAdmissionsQuery, Result<GetAllAdmissionsResponse>> handler,
+        CancellationToken cancellationToken)
     {
         var query = new GetAllAdmissionsQuery();
         var result = await handler.HandleAsync(query, cancellationToken);

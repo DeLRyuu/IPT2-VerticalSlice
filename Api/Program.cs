@@ -5,6 +5,7 @@ using Api.Features.Auth;
 using Application.Abstractions;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Features.Auth.Login;
 using Application.Features.Auth.Register;
 using Application.Features.Students.CreateStudent;
 using Application.Features.Students.GetAllStudents;
@@ -22,12 +23,17 @@ using Infrastructure.Persistence;
 using Infrastructure.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
+var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 
 // Database
 builder.Services.AddDbContext<IAppDbContext, AppDbContext>(options =>
- options.UseSqlite(builder.Configuration.GetConnectionString("Database")));
+    options.UseSqlite(builder.Configuration.GetConnectionString("Database")));
 
 // Validators
 builder.Services.AddValidatorsFromAssemblyContaining<CreateStudentValidator>();
@@ -45,6 +51,7 @@ builder.Services.AddScoped<IQueryHandler<GetAllAdmissionsQuery, Result<GetAllAdm
 builder.Services.AddScoped<ICommandHandler<UpdateCourseCommand, Result<UpdateCourseResponse>>, UpdateCourseCommandHandler>();
 builder.Services.AddScoped<IPasswordHasher, Infrastructure.Authentication.PasswordHasher>();
 builder.Services.AddScoped<ICommandHandler<RegisterCommand, Result<RegisterResponse>>, RegisterCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<LoginCommand, Result<LoginResponse>>, LoginCommandHandler>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -54,12 +61,28 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, _, _) =>
     {
-        document.Info.Title = "Vertical Slice API";
-        document.Info.Description = "A simple API demonstrating Vertical Slice Architecture";
-        return Task.CompletedTask;
+    document.Components ??= new OpenApiComponents();
+    document.Components.SecuritySchemes ??= new Dictionary<string,
+    IOpenApiSecurityScheme>();
+    document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Paste the access token from /api/auth/login"
+    };
+    document.Security ??= [];
+    document.Security.Add(new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+    
+    return Task.CompletedTask;
     });
 });
 
+
+// JWT options
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .Validate(o => !string.IsNullOrWhiteSpace(o.SigningKey),
@@ -68,6 +91,26 @@ builder.Services.AddOptions<JwtOptions>()
         "Jwt:SigningKey must be at least 256 bits (32 characters).")
     .ValidateOnStart();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+
+// Authentication / Authorization
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSection["SigningKey"]!)),
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -80,6 +123,9 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseAuthentication(); // who are you?
+app.UseAuthorization();  // are you allowed?
 
 // Root endpoint
 app.MapGet("/", () => "Welcome to the Vertical Slice API! Go to /scalar/v1 for API documentation.");
