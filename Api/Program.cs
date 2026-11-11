@@ -1,8 +1,11 @@
 using Api.Features.Students;
 using Api.Features.Courses;
 using Api.Features.Admissions;
+using Api.Features.Auth;
+using Application.Abstractions;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Features.Auth.Register;
 using Application.Features.Students.CreateStudent;
 using Application.Features.Students.GetAllStudents;
 using Application.Features.Students.GetStudentById;
@@ -16,6 +19,7 @@ using Application.Features.Courses.UpdateCourse;
 using Domain.Common;
 using FluentValidation;
 using Infrastructure.Persistence;
+using Infrastructure.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -40,6 +44,9 @@ builder.Services.AddScoped<IQueryHandler<GetAdmissionByIdQuery, Result<GetAdmiss
 builder.Services.AddScoped<IQueryHandler<GetAllAdmissionsQuery, Result<GetAllAdmissionsResponse>>, GetAllAdmissionsQueryHandler>();
 builder.Services.AddScoped<ICommandHandler<UpdateCourseCommand, Result<UpdateCourseResponse>>, UpdateCourseCommandHandler>();
 builder.Services.AddScoped<IPasswordHasher, Infrastructure.Authentication.PasswordHasher>();
+builder.Services.AddScoped<ICommandHandler<RegisterCommand, Result<RegisterResponse>>, RegisterCommandHandler>();
+
+builder.Services.AddSingleton(TimeProvider.System);
 
 // API
 builder.Services.AddEndpointsApiExplorer();
@@ -52,6 +59,15 @@ builder.Services.AddOpenApi(options =>
         return Task.CompletedTask;
     });
 });
+
+builder.Services.AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+    .Validate(o => !string.IsNullOrWhiteSpace(o.SigningKey),
+        "Jwt:SigningKey is required. Set it with: dotnet user-secrets set \"Jwt:SigningKey\" \"<value>\"")
+    .Validate(o => System.Text.Encoding.UTF8.GetByteCount(o.SigningKey ?? "") >= 32,
+        "Jwt:SigningKey must be at least 256 bits (32 characters).")
+    .ValidateOnStart();
+builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
 var app = builder.Build();
 
@@ -69,6 +85,7 @@ if (app.Environment.IsDevelopment())
 app.MapGet("/", () => "Welcome to the Vertical Slice API! Go to /scalar/v1 for API documentation.");
 
 // Map endpoints
+app.MapAuthEndpoints();
 app.MapStudentEndpoints();
 app.MapCourseEndpoints();
 app.MapAdmissionEndpoints();
