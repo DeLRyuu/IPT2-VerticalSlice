@@ -1,6 +1,7 @@
 namespace Api.Features.Courses;
 
 using Api.Common.Extensions;
+using Api.Common.Authorization;
 using Application.Abstractions.Messaging;
 using Application.Features.Courses.CreateCourse;
 using Application.Features.Courses.GetAllCourses;
@@ -13,18 +14,20 @@ public static class CourseEndpoints
     public static void MapCourseEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/courses")
-            .WithTags("Courses")
-            .RequireAuthorization();
+        .WithTags("Courses")
+        .RequireAuthorization();
 
         group.MapGet("/", GetAll)
             .WithName("GetAllCourses")
             .WithSummary("Get all courses");
 
         group.MapPut("/{id:guid}", Update)
+            .RequireAuthorization(Policies.CanManageCourses)
             .WithName("UpdateCourse")
             .WithSummary("Update an existing course");
 
         group.MapPost("/", Create)
+            .RequireAuthorization(Policies.CanManageCourses)
             .WithName("CreateCourse")
             .WithSummary("Create a new course");
 

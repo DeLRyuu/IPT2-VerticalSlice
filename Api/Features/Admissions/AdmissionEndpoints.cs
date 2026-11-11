@@ -2,6 +2,7 @@ namespace Api.Features.Admissions;
 
 using Application.Features.Admissions.GetAllAdmissions;
 using Api.Common.Extensions;
+using Api.Common.Authorization;
 using Application.Abstractions.Messaging;
 using Application.Features.Admissions.CreateAdmission;
 using Application.Features.Admissions.GetAdmissionById;
@@ -12,14 +13,16 @@ public static class AdmissionEndpoints
     public static void MapAdmissionEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admissions")
-            .WithTags("Admissions")
-            .RequireAuthorization();
+        .WithTags("Admissions")
+        .RequireAuthorization();
 
         group.MapPost("/", Create)
+            .RequireAuthorization(Policies.CanManageAdmissions)
             .WithName("CreateAdmission")
             .WithSummary("Create a new admission with courses");
 
         group.MapGet("/", GetAll)
+            .RequireAuthorization(Policies.CanManageAdmissions)
             .WithName("GetAllAdmissions")
             .WithSummary("Get all admissions");
 

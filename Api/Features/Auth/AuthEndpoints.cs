@@ -3,6 +3,7 @@ namespace Api.Features.Auth;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Api.Common.Extensions;
+using Api.Common.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Features.Auth.Login;

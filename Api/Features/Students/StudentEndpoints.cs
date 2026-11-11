@@ -1,6 +1,7 @@
 namespace Api.Features.Students;
 
 using Api.Common.Extensions;
+using Api.Common.Authorization;
 using Application.Abstractions.Messaging;
 using Application.Features.Students.CreateStudent;
 using Application.Features.Students.GetAllStudents;
@@ -12,20 +13,23 @@ public static class StudentEndpoints
     public static void MapStudentEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/students")
-            .WithTags("Students")
-            .RequireAuthorization();
+        .WithTags("Students")
+        .RequireAuthorization();
 
-        group.MapGet("/", GetAll)
-            .WithName("GetAllStudents")
-            .WithSummary("Get all students");
+    group.MapGet("/", GetAll)
+        .RequireAuthorization(Policies.CanManageStudents)
+        .WithName("GetAllStudents")
+        .WithSummary("Get all students");
 
-        group.MapPost("/", Create)
-            .WithName("CreateStudent")
-            .WithSummary("Create a new student");
+    group.MapPost("/", Create)
+        .RequireAuthorization(Policies.CanManageStudents)
+        .WithName("CreateStudent")
+        .WithSummary("Create a new student");
 
-        group.MapGet("/{id:guid}", GetById)
-            .WithName("GetStudentById")
-            .WithSummary("Get student by ID");
+    group.MapGet("/{id:guid}", GetById)
+        .RequireAuthorization(Policies.CanManageStudents)
+        .WithName("GetStudentById")
+        .WithSummary("Get student by ID");
     }
 
     private static async Task<IResult> GetAll(
